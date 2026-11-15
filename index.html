@@ -1,0 +1,148 @@
+code = r'''<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#071525">
+<title>UAE WEATHER | طقس الإمارات</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#071525;--panel:#10243a;--panel2:#172e47;--gold:#e6c477;--text:#f4f7fb;--muted:#9aacc0;--border:#ffffff16}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,Tahoma,sans-serif}
+button,select{font:inherit;cursor:pointer}header{height:72px;padding:0 5%;display:flex;align-items:center;justify-content:space-between;background:#091a2c;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1000}
+.logo{font-size:23px;font-weight:900;color:var(--gold)}.logo span{color:white}.actions{display:flex;gap:8px}
+.btn{background:var(--panel2);color:white;border:1px solid var(--border);border-radius:10px;padding:10px 13px}
+.hero{padding:35px 5%;background:radial-gradient(circle at 80% 10%,#1b4965,transparent 45%),linear-gradient(120deg,#0a2037,#0b192b)}
+.hero h1{font-size:clamp(25px,5vw,42px);margin:0 0 10px}.hero p{color:var(--muted);line-height:1.7}
+.location{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}select{background:var(--panel);color:white;border:1px solid var(--border);padding:13px;border-radius:10px}
+.gold{background:var(--gold);color:#111d2a;border:0;font-weight:bold;border-radius:10px;padding:13px 17px}
+main{padding:25px 5%;max-width:1500px;margin:auto}.section-title{font-size:21px;margin:28px 0 15px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.panel{background:var(--panel);border:1px solid var(--border);border-radius:17px;padding:18px;min-width:0}
+.current{grid-column:span 2;grid-row:span 2;background:linear-gradient(145deg,#153b59,#10243a)}
+.bigtemp{font-size:65px;font-weight:800;margin:10px 0}.muted{color:var(--muted)}.weather-icon{font-size:42px}
+.metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:22px}.metric{background:#ffffff09;padding:13px;border-radius:12px}.metric b{display:block;font-size:19px;margin-top:7px}
+#map{height:430px;border-radius:16px;overflow:hidden;border:1px solid var(--border);z-index:1}
+.map-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.map-tools button{background:var(--panel2);color:white;border:1px solid var(--border);border-radius:9px;padding:10px 13px}.map-tools button.active{background:var(--gold);color:#111}
+.radar-controls{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}.radar-controls input{flex:1;min-width:120px}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:9px}.day{text-align:center;padding:13px 7px;background:var(--panel);border:1px solid var(--border);border-radius:12px}
+.day .icon{font-size:25px;margin:10px 0}.day b{display:block;margin:7px 0}.hourly{display:flex;gap:10px;overflow-x:auto;padding-bottom:10px}
+.hour{min-width:85px;text-align:center;background:var(--panel);padding:14px 8px;border-radius:12px}.hour b{display:block;margin:10px 0}
+.sea-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.sea-grid .panel b{font-size:22px;display:block;margin-top:10px}
+.notice{padding:15px;background:#18364d;border:1px solid #2c5d7d;border-radius:12px;line-height:1.8;color:#dceeff}
+footer{text-align:center;color:var(--muted);padding:30px;border-top:1px solid var(--border);line-height:2}a{color:var(--gold)}
+@media(max-width:850px){.grid{grid-template-columns:repeat(2,1fr)}.current{grid-column:span 2}.days{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:500px){header{padding:0 3%}.logo{font-size:17px}.actions .btn{padding:9px 8px;font-size:12px}main{padding:18px 4%}.grid{gap:9px}.panel{padding:13px}.bigtemp{font-size:52px}.days{grid-template-columns:repeat(2,1fr)}#map{height:350px}.sea-grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<header>
+ <div class="logo">UAE <span>WEATHER</span></div>
+ <div class="actions">
+  <button class="btn" onclick="toggleLang()" id="langBtn">English</button>
+  <button class="btn" onclick="enableAlerts()" id="alertBtn">🔔 تنبيهات المطر</button>
+ </div>
+</header>
+<section class="hero">
+ <h1 id="heroTitle">طقس الإمارات 🇦🇪</h1>
+ <p id="heroText">الرادار، الأمطار، الرياح، البحر وتوقعات الطقس في مكان واحد.</p>
+ <div class="location">
+  <select id="city" onchange="changeCity()">
+   <option value="25.4052,55.5136">عجمان</option><option value="25.2048,55.2708">دبي</option>
+   <option value="24.4539,54.3773">أبوظبي</option><option value="25.3463,55.4209">الشارقة</option>
+   <option value="25.1288,56.3265">الفجيرة</option><option value="25.3394,56.3567">خورفكان</option>
+   <option value="25.0670,56.3620">كلباء</option><option value="25.7895,55.9432">رأس الخيمة</option>
+   <option value="25.5647,55.5533">أم القيوين</option>
+  </select>
+  <button class="gold" onclick="useMyLocation()" id="locBtn">📍 موقعي الحالي</button>
+  <button class="btn" onclick="loadAll()">تحديث البيانات ↻</button>
+ </div>
+</section>
+<main>
+ <h2 class="section-title" id="currentTitle">🌤️ الطقس الحالي</h2>
+ <div class="grid">
+  <div class="panel current">
+   <div class="weather-icon" id="weatherIcon">🌤️</div><div class="muted" id="placeName">عجمان، الإمارات</div>
+   <div class="bigtemp"><span id="temp">--</span>°</div><h3 id="condition">جاري تحميل الطقس...</h3>
+   <div class="muted">المحسوسة <span id="feels">--</span>°</div>
+   <div class="metrics">
+    <div class="metric">💧 الرطوبة<b id="humidity">--%</b></div><div class="metric">☁️ الغيوم<b id="cloud">--%</b></div>
+    <div class="metric">🌬️ سرعة الرياح<b id="wind">-- كم/س</b></div><div class="metric">🧭 اتجاه الرياح<b id="direction">--</b></div>
+    <div class="metric">🌧️ الأمطار<b id="rain">-- ملم</b></div><div class="metric">📊 الضغط<b id="pressure">-- hPa</b></div>
+   </div>
+  </div>
+  <div class="panel"><div class="muted">🌡️ أعلى درجة اليوم</div><div class="bigtemp" style="font-size:39px"><span id="max">--</span>°</div></div>
+  <div class="panel"><div class="muted">❄️ أقل درجة اليوم</div><div class="bigtemp" style="font-size:39px"><span id="min">--</span>°</div></div>
+  <div class="panel"><div class="muted">💨 هبات الرياح</div><div class="bigtemp" style="font-size:35px"><span id="gust">--</span></div><div class="muted">كم/س</div></div>
+  <div class="panel"><div class="muted">☀️ مؤشر الأشعة UV</div><div class="bigtemp" style="font-size:35px" id="uv">--</div></div>
+ </div>
+ <h2 class="section-title">🕒 توقعات الساعات القادمة</h2><div class="hourly" id="hourly"><div class="panel">جاري التحميل...</div></div>
+ <h2 class="section-title">📅 توقعات 7 أيام</h2><div class="days" id="days"><div class="panel">جاري التحميل...</div></div>
+ <h2 class="section-title">🌧️ رادار الأمطار</h2>
+ <div class="notice" id="radarNote">يعرض الرادار صور الهطول السابقة المتاحة، وليس توقعاً مؤكداً للأمطار القادمة.</div>
+ <div class="map-tools">
+  <button class="active" onclick="setLayer('radar',this)">🌧️ رادار المطر</button>
+  <button onclick="setLayer('cloud',this)">☁️ الغيوم</button>
+  <button onclick="setLayer('wind',this)">🌬️ الرياح</button>
+ </div>
+ <div id="map"></div>
+ <div class="radar-controls">
+  <button class="gold" onclick="playRadar()" id="playBtn">▶ تشغيل الرادار</button><button class="btn" onclick="stopRadar()">إيقاف</button>
+  <input type="range" id="frameRange" min="0" max="0" value="0" oninput="showFrame(+this.value)"><span id="frameTime" class="muted">--</span>
+ </div>
+ <h2 class="section-title">🌊 حالة البحر</h2>
+ <div class="sea-grid">
+  <div class="panel">🌊 ارتفاع الأمواج<b id="waves">-- متر</b></div>
+  <div class="panel">🌡️ حرارة البحر<b id="seaTemp">--°</b></div>
+  <div class="panel">🧭 اتجاه الأمواج<b id="waveDir">--°</b></div>
+ </div>
+ <p class="notice">بيانات البحر تقديرية من نماذج التنبؤ، وقد تكون محدودة الدقة قرب الشواطئ. لا تعتمد عليها للملاحة أو قرارات السلامة البحرية.</p>
+ <h2 class="section-title">🔔 تنبيهات المطر</h2>
+ <div class="panel"><p id="alertStatus">فعّل الإشعارات للسماح للموقع بتنبيهك عند رصد احتمال أمطار في بيانات التوقع.</p><button class="gold" onclick="enableAlerts()">تفعيل إشعارات المطر</button></div>
+ <p class="muted" id="updated">آخر تحديث: --</p>
+</main>
+<footer><b>UAE WEATHER 🇦🇪</b><br>بيانات الطقس: <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a><br>الرادار: <a href="https://www.rainviewer.com/" target="_blank">RainViewer</a><br>الخرائط: © OpenStreetMap contributors</footer>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let lat=25.4052,lon=55.5136,cityName="عجمان",weatherData=null,map=null,radarLayer=null,cloudLayer=null,frames=[],frameIndex=0,radarTimer=null,layerType="radar",english=false,lastRainAlert="";
+const $=id=>document.getElementById(id);
+function weatherText(code){const a={0:"سماء صافية",1:"غالباً صافٍ",2:"غائم جزئياً",3:"غائم",45:"ضباب",48:"ضباب متجمد",51:"رذاذ خفيف",53:"رذاذ",55:"رذاذ كثيف",61:"مطر خفيف",63:"مطر متوسط",65:"مطر غزير",80:"زخات مطر",81:"زخات متوسطة",82:"زخات قوية",95:"عواصف رعدية",96:"عواصف مع برد",99:"عواصف قوية"};return a[code]||"حالة جوية متغيرة"}
+function icon(c){if(c===0)return"☀️";if([1,2].includes(c))return"🌤️";if(c===3)return"☁️";if([45,48].includes(c))return"🌫️";if([51,53,55,61,63,65,80,81,82].includes(c))return"🌧️";if([95,96,99].includes(c))return"⛈️";return"🌤️"}
+function direction(d){return["شمال","شمال شرق","شرق","جنوب شرق","جنوب","جنوب غرب","غرب","شمال غرب"][Math.round(d/45)%8]}
+function timeLabel(t){return new Date(t).toLocaleTimeString(english?"en-US":"ar-AE",{hour:"2-digit",minute:"2-digit",timeZone:"Asia/Dubai"})}
+function dateLabel(t){return new Date(t+"T12:00:00").toLocaleDateString(english?"en-US":"ar-AE",{weekday:"short",day:"numeric",month:"short"})}
+async function loadAll(){
+ $("condition").textContent="جاري تحميل البيانات...";
+ const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,cloud_cover,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max&forecast_days=7&timezone=Asia%2FDubai`;
+ try{const r=await fetch(url);if(!r.ok)throw Error();weatherData=await r.json();renderWeather()}catch(e){$("condition").textContent="تعذر تحميل الطقس. حاول مرة ثانية."}
+ loadMarine();loadRadar();$("updated").textContent="آخر تحديث: "+new Date().toLocaleTimeString("ar-AE");
+}
+function renderWeather(){
+ const c=weatherData.current,d=weatherData.daily,h=weatherData.hourly;
+ $("temp").textContent=Math.round(c.temperature_2m);$("feels").textContent=Math.round(c.apparent_temperature);$("weatherIcon").textContent=icon(c.weather_code);$("condition").textContent=weatherText(c.weather_code);
+ $("humidity").textContent=c.relative_humidity_2m+"%";$("cloud").textContent=c.cloud_cover+"%";$("wind").textContent=c.wind_speed_10m+" كم/س";$("direction").textContent=direction(c.wind_direction_10m);$("rain").textContent=c.precipitation+" ملم";$("pressure").textContent=c.pressure_msl+" hPa";$("gust").textContent=c.wind_gusts_10m;
+ $("max").textContent=Math.round(d.temperature_2m_max[0]);$("min").textContent=Math.round(d.temperature_2m_min[0]);$("uv").textContent=d.uv_index_max[0];
+ let start=h.time.findIndex(t=>new Date(t)>=new Date());if(start<0)start=0;
+ $("hourly").innerHTML=Array.from({length:12},(_,i)=>{let n=start+i;if(n>=h.time.length)return"";return `<div class="hour"><span>${timeLabel(h.time[n])}</span><div class="weather-icon">${icon(h.weather_code[n])}</div><b>${Math.round(h.temperature_2m[n])}°</b><small>🌧️ ${h.precipitation_probability[n]??0}%</small><br><small>💨 ${h.wind_speed_10m[n]} كم/س</small></div>`}).join("");
+ $("days").innerHTML=d.time.map((t,i)=>`<div class="day"><span>${dateLabel(t)}</span><div class="icon">${icon(d.weather_code[i])}</div><b>${Math.round(d.temperature_2m_max[i])}° / ${Math.round(d.temperature_2m_min[i])}°</b><small>🌧️ ${d.precipitation_probability_max[i]??0}%</small><br><small>UV ${d.uv_index_max[i]}</small></div>`).join("");
+ checkRain();
+}
+async function loadMarine(){try{const u=`https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&current=wave_height,wave_direction,sea_surface_temperature&timezone=Asia%2FDubai`;const r=await fetch(u);if(!r.ok)throw Error();const d=await r.json();$("waves").textContent=(d.current.wave_height??"--")+" متر";$("seaTemp").textContent=(d.current.sea_surface_temperature??"--")+"°";$("waveDir").textContent=(d.current.wave_direction??"--")+"°"}catch(e){$("waves").textContent="غير متاح";$("seaTemp").textContent="غير متاح";$("waveDir").textContent="غير متاح"}}
+function initMap(){map=L.map("map").setView([lat,lon],8);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(map);L.marker([lat,lon]).addTo(map).bindPopup("موقع الطقس")}
+async function loadRadar(){try{const r=await fetch("https://api.rainviewer.com/public/weather-maps.json");if(!r.ok)throw Error();const data=await r.json();frames=data.radar?.past||[];if(!frames.length)throw Error();$("frameRange").max=frames.length-1;showFrame(frames.length-1);$("radarNote").textContent="رادار الأمطار يعرض صور الهطول السابقة المتاحة، وقد تختلف التغطية حسب المنطقة."}catch(e){$("radarNote").textContent="الرادار غير متاح حالياً. جرّب لاحقاً؛ عدم ظهور الرادار لا يعني عدم وجود أمطار."}}
+function showFrame(i){if(!frames.length||!map)return;frameIndex=i;$("frameRange").value=i;const f=frames[i];if(radarLayer)map.removeLayer(radarLayer);radarLayer=L.tileLayer(`https://tilecache.rainviewer.com${f.path}/256/{z}/{x}/{y}/2/1_1.png`,{opacity:.7,maxNativeZoom:7,maxZoom:12});if(layerType==="radar")radarLayer.addTo(map);$("frameTime").textContent=new Date(f.time*1000).toLocaleTimeString("ar-AE",{hour:"2-digit",minute:"2-digit"})}
+function playRadar(){if(!frames.length)return;stopRadar();$("playBtn").textContent="⏸ تشغيل الرادار";radarTimer=setInterval(()=>{frameIndex=(frameIndex+1)%frames.length;showFrame(frameIndex)},800)}
+function stopRadar(){clearInterval(radarTimer);$("playBtn").textContent="▶ تشغيل الرادار"}
+function setLayer(type,button){layerType=type;document.querySelectorAll(".map-tools button").forEach(b=>b.classList.remove("active"));button.classList.add("active");if(radarLayer)map.removeLayer(radarLayer);if(cloudLayer)map.removeLayer(cloudLayer);if(type==="radar"&&radarLayer)radarLayer.addTo(map);if(type==="cloud")$("radarNote").textContent="طبقة الغيوم الحية غير مربوطة في هذه النسخة. نقدر نضيف مزود بيانات مناسب لاحقاً.";if(type==="wind")$("radarNote").textContent="بيانات سرعة واتجاه الرياح موجودة في بطاقات الطقس. خريطة الرياح الحركية تحتاج مزود خرائط إضافي."}
+function changeCity(){const p=$("city").value.split(",");lat=+p[0];lon=+p[1];cityName=$("city").selectedOptions[0].text;$("placeName").textContent=cityName+"، الإمارات";map.setView([lat,lon],8);loadAll()}
+function useMyLocation(){if(!navigator.geolocation){alert("المتصفح لا يدعم تحديد الموقع");return}navigator.geolocation.getCurrentPosition(p=>{lat=p.coords.latitude;lon=p.coords.longitude;cityName="موقعي الحالي";$("placeName").textContent=cityName;map.setView([lat,lon],10);loadAll()},()=>alert("تعذر تحديد موقعك. تأكد من السماح للموقع باستخدام موقعك."))}
+async function enableAlerts(){if(!("Notification"in window)){alert("المتصفح لا يدعم الإشعارات");return}const p=await Notification.requestPermission();if(p==="granted"){$("alertStatus").textContent="تم السماح بالإشعارات. في هذه النسخة يجب أن يبقى الموقع مفتوحاً حتى يفحص الطقس ويرسل التنبيه.";$("alertBtn").textContent="🔔 الإشعارات مفعّلة";checkRain()}else $("alertStatus").textContent="لم يتم السماح بالإشعارات. فعّلها من إعدادات المتصفح."}
+function checkRain(){if(!weatherData||!("Notification"in window)||Notification.permission!=="granted")return;const h=weatherData.hourly;let i=h.time.findIndex(t=>new Date(t)>=new Date());if(i<0)return;const prob=h.precipitation_probability[i]||0,amount=h.precipitation[i]||0,key=h.time[i];if((prob>=60||amount>=0.2)&&key!==lastRainAlert){new Notification("🌧️ تنبيه طقس الإمارات",{body:`احتمال هطول أمطار في ${cityName}. فرصة المطر ${prob}%.`});lastRainAlert=key}}
+function toggleLang(){english=!english;document.documentElement.lang=english?"en":"ar";document.documentElement.dir=english?"ltr":"rtl";$("langBtn").textContent=english?"العربية":"English";$("heroTitle").textContent=english?"UAE Weather 🇦🇪":"طقس الإمارات 🇦🇪";$("heroText").textContent=english?"Radar, rain, wind, sea and forecasts in one place.":"الرادار، الأمطار، الرياح، البحر وتوقعات الطقس في مكان واحد.";$("currentTitle").textContent=english?"🌤️ Current weather":"🌤️ الطقس الحالي";$("locBtn").textContent=english?"📍 My location":"📍 موقعي الحالي";$("alertBtn").textContent=english?"🔔 Rain alerts":"🔔 تنبيهات المطر"}
+initMap();loadAll();setInterval(loadAll,15*60*1000);
+</script>
+</body>
+</html>'''
+path = "/mnt/data/index.html"
+with open(path, "w", encoding="utf-8") as f:
+    f.write(code)
+print(path, len(code), "characters")
